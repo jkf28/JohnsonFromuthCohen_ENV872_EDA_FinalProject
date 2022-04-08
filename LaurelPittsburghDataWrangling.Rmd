@@ -1,0 +1,81 @@
+---
+title: "Data Wrangling"
+author: "Laurel Cohen"
+date: "4/7/2022"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+## Packages and Census Key
+
+```{r setup}
+getwd()
+
+#install.packages("tigris")
+#install.packages("sf")
+#install.packages("tidycensus")
+library(tidyverse)
+library(lubridate)
+library(tigris)
+library(mapview)
+library(sf)
+library(ggplot2)
+library(tidycensus)
+library(dplyr)
+options(tigris_use_cache = TRUE)
+
+census_api_key("f79affa4d804f18c2667e3d4d8e19a589bbcc861", install = TRUE)
+readRenviron("~/.Renviron")
+Sys.getenv("CENSUS_API_KEY")
+```
+
+## Census Tracts
+
+```{r import Pittsburgh census tracts}
+tracts <- 
+  read.csv("census tracts.csv", stringsAsFactors = TRUE)
+
+tracts <- 
+  read.csv('census tracts.csv', colClasses=c("X0103"="character"))
+
+```
+
+## Income Data
+
+Start with tract-level ACS income data for Allegheny County, then add a CensusTract column and filter out the CensusTract column for the tracts that belong to Pittsburgh (extracted from certain digits of the GEOID).
+
+```{r income data}
+allegheny_income <- get_acs(
+  geography = "tract", 
+  variables = "B19013_001",
+  state = '42003',
+  county = '003',
+  geometry = TRUE
+)
+
+filtered_allegheny_income <- transform(allegheny_income, CensusTract = substr(GEOID, 6, 9))
+
+pittsburgh_income <- filtered_allegheny_income %>% 
+      filter(CensusTract %in% tracts$X0103)
+
+```
+
+## Bike Lane Data
+
+```{r bike lane shapefile data}
+bike_map_2019 <- st_read(
+  "./bike-map-2019/Bike Lanes/Bike Lanes.shp")
+
+```
+
+## Plot Both Layers
+
+```{r plot income and bike lanes}
+ggplot() + 
+  geom_sf(data=pittsburgh_income, aes(fill=estimate)) + 
+  geom_sf(data=bike_map_2019, aes(color=BikeInfDis)) +
+  scale_color_distiller(palette = "YlOrRd")
+
+```
+
