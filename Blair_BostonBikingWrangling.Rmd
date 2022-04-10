@@ -1,8 +1,10 @@
 ---
-title: "Untitled"
+title: "Boston Data Wrangling"
 author: "Blair Johnson"
 date: '2022-04-07'
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -16,17 +18,20 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r load packages}
-install.packages("rgdal")
-install.packages("tidycensus")
-install.packages("uuid")
+#install.packages("rgdal")
+#install.packages("tidycensus")
+#install.packages("uuid")
 
 library(tidycensus)
+library(rgdal)
+library(uuid)
 library(dplyr)
 options(tigris_use_cache = TRUE)
 library(sf)
 library(tigris)
 library(leaflet)
 library(mapview)
+mapviewOptions(fgb = FALSE)
 library(ggplot2)
 library(tidyr)
 
@@ -34,7 +39,10 @@ library(tidyr)
 ```
 
 ```{r load bike data}
-Bikes.2021 <- read.csv("../JohnsonFromuthCohen_ENV872_EDA_FinalProject/Data/Blue_Bike_Stations_2021.csv", stringsAsFactors = TRUE)
+Bikes.2021 <- read.csv("Blue_Bike_Stations_2021.csv", stringsAsFactors = TRUE)
+
+Bikes.2021 <- Bikes.2021 %>%
+      filter(District=="Boston")
 ```
 
 ```{r convert bike data into shapefile}
@@ -44,17 +52,16 @@ Bikes.2021.sf <- Bikes.2021 %>%
 ```
 
 
-
 ```{r , census data load echo=FALSE}
 
 #Get key
 census_api_key('111339232f4137ed330544649d9c1c65d82c047c', `install=TRUE`)
 
-census.data <-read.csv("../JohnsonFromuthCohen_ENV872_EDA_FinalProject/Data/boston_census.csv")
+#census.data <-read.csv("boston_census.csv")
 
 #Get ACS variables 
 v20 <- load_variables(2020, "acs5", cache = TRUE)
-View(v20)
+#View(v20)
 
 #census tract data for income
 ma_suffolk.income <- get_acs(
@@ -78,6 +85,50 @@ ma_suffolk.race <- get_acs(
   county = "Suffolk"
 )
 
+#census tract data for LABOR FORCE STATUS BY PRESENCE OF A COMPUTER AND TYPES OF INTERNET SUBSCRIPTION IN HOUSEHOLD 
+#ma_suffolk.labor.internet <- get_acs(
+#  geography = "tract", 
+#  variables = c(totlabor= "B28007_001" , laborforce = "B28007_002", employed = "B28007_003",
+#                compemployed = "B28007_004" , dialcompemployed = "B28007_005", broadcompemployed = #"B28007_006",
+#                nointernetemployed = "B28007_007" , nocompemployed = "B28007_008", unemployed = #"B28007_009",
+#               compunemployed = "B28007_010" , dialcompunemployed = "B28007_011", broadcompunemployed = #"B28007_012",
+#                nointernetunemployed = "B28007_013" , nocompunemployed = "B28007_014", nonlabor = #"B28007_015",
+#                compnonlabor = "B28007_016" , dialcompnonlabor = "B28007_017", broadcompnonlabor = #"B28007_018",
+#                notinernetnonlabor = "B28007_019" , nocompnonlabor = "B28007_020"
+#                ),  
+#  state = "MA", 
+#  geometry = TRUE,
+#  year = 2020,
+#  county = "Suffolk"
+#)
+
+
+ma_suffolk.wfh <- get_acs(
+  geography = "tract", 
+  variables = c(workfromhome="B08301_021"),  
+  state = "MA", 
+  geometry = TRUE,
+  year = 2020,
+  county = "Suffolk"
+)
+```
+
+```{r import shapefile and filter data from Suffolk County to Boston city level}
+census_tracts <- st_read(
+  "./Census2020_Tracts/Census2020_Tracts.shp")
+
+ma_suffolk.income <- ma_suffolk.income %>% 
+      filter(GEOID %in% census_tracts$GEOID20)
+
+ma_suffolk.race <- ma_suffolk.race %>% 
+      filter(GEOID %in% census_tracts$GEOID20)
+
+#ma_suffolk.labor.internet <- ma_suffolk.labor.internet %>% 
+#      filter(GEOID %in% census_tracts$GEOID20)
+
+ma_suffolk.wfh <- ma_suffolk.wfh %>% 
+      filter(GEOID %in% census_tracts$GEOID20)
+
 ```
 
 ```{r}
@@ -88,6 +139,19 @@ ma_suffolk.race <-select(ma_suffolk.race, -moe
 
 ma_suffolk.race.1<-spread(ma_suffolk.race, key=variable, value=estimate)
 ma_suffolk.race.1
+
+
+#ma_suffolk.labor.internet.1 <-select(ma_suffolk.labor.internet, -moe
+#                      )
+
+#ma_suffolk.labor.internet.1<-spread(ma_suffolk.labor.internet, key=variable, value=estimate)
+#ma_suffolk.labor.internet
+
+
+ma_suffolk.wfh.1 <-select(ma_suffolk.wfh, -moe)
+
+ma_suffolk.wfh.1<-spread(ma_suffolk.wfh.1, key=variable, value=estimate)
+
 ```
 
 ```{r}
@@ -95,6 +159,27 @@ ma_suffolk.race.1
 #Calculate percentages 
 ma_suffolk.race.1 <- mutate(ma_suffolk.race.1, perwhite = white/totpop,
                             perblack = black/totpop) 
+
+#ma_suffolk.labor.internet.1 <- mutate(ma_suffolk.labor.internet.1,
+#                                    perbroadcompemployed = broadcompemployed/totlabor,
+#                                    perbroadcompnonlabor = broadcompnonlabor/totlabor,
+#                                    perbroadcompunemployed = broadcompunemployed/totlabor,
+#                                    percompemployed = compemployed/totlabor,
+#                                    percompnonlabor = compnonlabor/totlabor,
+#                                    percompunemployed = compunemployed/totlabor,
+#                                    perdialcompemployed = dialcompemployed/totlabor,
+#                                    perdialcompnonlabor = dialcompnonlabor/totlabor,
+#                                    perdialcompunemployed = dialcompunemployed/totlabor,
+#                                    peremployed = employed/totlabor,
+#                                    perlaborforce = laborforce/totlabor,
+#                                    pernocompemployed = nocompemployed/totlabor,
+#                                    pernocompnonlabor = nocompnonlabor/totlabor,
+#                                    pernocompunemployed = nocompunemployed/totlabor,
+#                                    pernointernetemployed = nointernetemployed/totlabor,
+#                                    pernointernetunemployed = nointernetunemployed/totlabor,
+#                                    pernonlabor = nonlabor/totlabor,
+#                                    pernotinernetnonlabor = notinernetnonlabor/totlabor,
+#                                    perunemployed = unemployed/totlabor)
 ```
 
 ```{r}
@@ -108,6 +193,13 @@ suffolk.income.sf <- ma_suffolk.income %>%
   st_as_sf(coords = c('geometry'),
            crs=4269)
 
+#suffolk.labor.internet.sf <- ma_suffolk.labor.internet.1 %>% 
+#  st_as_sf(coords = c('geometry'),
+#           crs=4269)
+
+suffolk.wfh.sf <- ma_suffolk.wfh.1 %>% 
+  st_as_sf(coords = c('geometry'),
+           crs=4269)
 
 ```
 
@@ -122,6 +214,12 @@ ggplot(suffolk.race.sf) + geom_sf(aes(fill=perblack))
 #map income
 ggplot(suffolk.income.sf) + geom_sf(aes(fill=estimate))
 
+#map labor force participation
+#ggplot(suffolk.labor.internet.sf) + geom_sf(aes(fill=perlaborforce))
+
+#map work from home
+ggplot(suffolk.wfh.sf) + geom_sf(aes(fill=workfromhome))
+
 
 #Income and bike stations
 ggplot() + geom_sf(data=suffolk.income.sf, aes(fill=estimate)) + geom_sf(data=Bikes.2021.sf, aes(color="white", alpha = 0.4))
@@ -130,6 +228,11 @@ ggplot() + geom_sf(data=suffolk.income.sf, aes(fill=estimate)) + geom_sf(data=Bi
 #Race and bike stations
 ggplot() + geom_sf(data=suffolk.race.sf, aes(fill=perwhite)) + geom_sf(data=Bikes.2021.sf, aes(color="white", alpha = 0.4))
 
+#labor force participation and bike stations
+#ggplot() + geom_sf(data=suffolk.labor.internet.sf, aes(fill=perlaborforce)) + geom_sf(data=Bikes.2021.sf, #aes(color="white", alpha = 0.4))
+
+#work from home and bike stations
+ggplot() + geom_sf(data=suffolk.wfh.sf, aes(fill=workfromhome)) + geom_sf(data=Bikes.2021.sf, aes(color="white", alpha = 0.4))
 
 mapview(suffolk.income.sf, zcol = 'estimate') 
 
