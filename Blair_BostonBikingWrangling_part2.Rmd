@@ -1,0 +1,169 @@
+---
+title: "Untitled"
+author: "Blair Johnson"
+date: '2022-04-07'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r load packages}
+install.packages("rgdal")
+install.packages("tidycensus")
+install.packages("uuid")
+
+library(tidycensus)
+library(dplyr)
+options(tigris_use_cache = TRUE)
+library(sf)
+library(tigris)
+library(leaflet)
+library(mapview)
+library(ggplot2)
+library(tidyr)
+
+
+```
+
+```{r load bike data}
+Bikes.2021 <- read.csv("../JohnsonFromuthCohen_ENV872_EDA_FinalProject/Data/Blue_Bike_Stations_2021.csv", stringsAsFactors = TRUE)
+```
+
+```{r convert bike data into shapefile}
+Bikes.2021.sf <- Bikes.2021 %>% 
+  st_as_sf(coords = c('Longitude', 'Latitude'), crs=4269)
+
+```
+
+
+
+```{r , census data load echo=FALSE}
+
+#Get key
+census_api_key('111339232f4137ed330544649d9c1c65d82c047c', `install=TRUE`)
+
+
+#Get ACS variables 
+v20 <- load_variables(2020, "acs5", cache = TRUE)
+View(v20)
+
+
+#census tract data for income
+ma_suffolk.income <- get_acs(
+  geography = "tract", 
+  variables = c(medIncome= "B19013_001" 
+                ),  
+  state = "MA", 
+  geometry = TRUE,
+  year = 2020,
+  county = "Suffolk"
+)
+
+#census tract data for race 
+ma_suffolk.race <- get_acs(
+  geography = "tract", 
+  variables = c(white= "B03002_003" , totpop = "B03002_001", black = "B03002_004"
+                ),  
+  state = "MA", 
+  geometry = TRUE,
+  year = 2020,
+  county = "Suffolk"
+)
+
+```
+
+```{r}
+
+#Organize data by removing moe and adjusting variables from long to wide 
+ma_suffolk.race <-select(ma_suffolk.race, -moe
+                      )
+
+ma_suffolk.race.1<-spread(ma_suffolk.race, key=variable, value=estimate)
+ma_suffolk.race.1
+```
+
+```{r}
+
+#Calculate percentages 
+ma_suffolk.race.1 <- mutate(ma_suffolk.race.1, perwhite = white/totpop,
+                            perblack = black/totpop) 
+```
+
+```{r}
+#Turn into shapefile 
+suffolk.race.sf <- ma_suffolk.race.1 %>% 
+  st_as_sf(coords = c('geometry'),
+           crs=4269)
+
+suffolk.income.sf <- ma_suffolk.income %>% 
+  st_as_sf(coords = c('geometry'),
+           crs=4269)
+```
+
+
+```{r}
+#Bikes only in Suffolk county
+bikes.suffolk <- Bikes.2021.sf[ma_suffolk.income,]
+
+bikes.suffolk.sf <- bikes.suffolk %>% 
+  st_as_sf(coords = c('geometry'),
+           crs=4269)
+
+```
+
+```{r}
+#map percent white
+ggplot(suffolk.race.sf) + geom_sf(aes(fill=perwhite))
+
+#map percent black
+ggplot(suffolk.race.sf) + geom_sf(aes(fill=perblack))
+
+#map income
+ggplot(suffolk.income.sf) + geom_sf(aes(fill=estimate))
+
+
+#Income and bike stations
+ggplot() + geom_sf(data=suffolk.income.sf, aes(fill=estimate)) + geom_sf(data=Bikes.2021.sf, aes(color="white", alpha = 0.4))
+
+
+#Race and bike stations
+ggplot() + geom_sf(data=suffolk.race.sf, aes(fill=perwhite)) + geom_sf(data=bikes.suffolk, aes(color=Total_docks, alpha = 0.7)) 
+
+
+ggplot() + geom_sf(data=suffolk.race.sf, aes(fill=perblack)) + geom_sf(data=bikes.suffolk, aes(color=Total_docks)) 
+```
+
+```{r}
+#Joining bike data and census tract data
+
+suffolk.join <- st_join(x = suffolk.income.sf, y = bikes.suffolk.sf, 
+                               join = st_intersects)
+
+suffolk.join.sf <- suffolk.join %>% 
+  st_as_sf(coords = c('geometry'),
+           crs=4269)
+
+mapview(suffolk.join.sf)
+```
+
+```{r}
+#Number of docks and stations per census tract. Can run regression see correlations. NA is zero 
+Bikes.Census <- suffolk.join %>%
+  group_by(NAME, estimate, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+```
+
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
