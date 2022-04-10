@@ -118,16 +118,25 @@ census_tracts <- st_read(
   "./Census2020_Tracts/Census2020_Tracts.shp")
 
 ma_suffolk.income <- ma_suffolk.income %>% 
-      filter(GEOID %in% census_tracts$GEOID20)
+      filter(GEOID %in% census_tracts$GEOID20) %>%
+      filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
+         GEOID != "25025990101", GEOID != "25025080801", 
+         GEOID != "25025981100")
 
 ma_suffolk.race <- ma_suffolk.race %>% 
       filter(GEOID %in% census_tracts$GEOID20)
+      filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
+         GEOID != "25025990101", GEOID != "25025080801", 
+         GEOID != "25025981100")
 
 #ma_suffolk.labor.internet <- ma_suffolk.labor.internet %>% 
 #      filter(GEOID %in% census_tracts$GEOID20)
 
 ma_suffolk.wfh <- ma_suffolk.wfh %>% 
       filter(GEOID %in% census_tracts$GEOID20)
+      filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
+         GEOID != "25025990101", GEOID != "25025080801", 
+         GEOID != "25025981100")
 
 ```
 
