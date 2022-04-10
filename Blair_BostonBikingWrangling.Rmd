@@ -135,8 +135,62 @@ mapview(suffolk.income.sf, zcol = 'estimate')
 
 ```
 
+```{r}
 
+```
 
+##homeownership (absolute) 
+```{r Homeownership absolute}
 
+boston_HMO <- get_acs(
+  geography = "tract", 
+  variables = "B25118_002E",
+  state = "25025", 
+  county = "025",
+  geometry = TRUE
+)
+
+plot(boston_HMO["estimate"]) 
+
+```
+
+##total homes (absolute) 
+```{r Total homes absolute}
+
+boston_Htot <- get_acs(
+  geography = "tract", 
+  variables = "B25118_001E",
+  state = "25025", 
+  county = "025",
+  geometry = TRUE
+  
+)
+```
+
+#Mutate data and create percentages 
+```{r mutate home data and plot}
+
+bostonmerge <- cbind(boston_HMO,boston_Htot)
+
+boston_HMOpr <- 
+  bostonmerge %>% 
+  filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
+         GEOID != "25025990101", GEOID != "25025080801", 
+         GEOID != "25025981100")%>%
+  select(GEOID, NAME, variable, estimate, estimate.1, geometry) %>%
+  mutate(percent = (estimate/estimate.1))
+  
+plot(boston_HMOpr["percent"])
+```
+
+```{r ggplot home data}
+
+ggplot() + 
+  geom_sf(data=boston_HMOpr, aes(fill=percent, geometry = geometry)) +
+  scale_color_distiller(palette = "YlOrRd")
+
+boston_HMOpr_sf <- boston_HMOpr %>% 
+  st_as_sf(coords = c('SITE_LONGITUDE','SITE_LATITUDE'), crs=4269)
+```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
