@@ -238,10 +238,6 @@ mapview(suffolk.income.sf, zcol = 'estimate')
 
 ```
 
-```{r}
-
-```
-
 ##homeownership (absolute) 
 ```{r Homeownership absolute}
 
