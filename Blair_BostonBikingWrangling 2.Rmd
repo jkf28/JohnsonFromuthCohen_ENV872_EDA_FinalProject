@@ -1,0 +1,365 @@
+---
+title: "Boston Data Wrangling"
+author: "Blair Johnson"
+date: '2022-04-07'
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r load packages}
+#install.packages("rgdal")
+#install.packages("tidycensus")
+#install.packages("uuid")
+
+library(tidycensus)
+library(rgdal)
+library(uuid)
+library(dplyr)
+options(tigris_use_cache = TRUE)
+library(sf)
+library(tigris)
+library(leaflet)
+library(mapview)
+mapviewOptions(fgb = FALSE)
+library(ggplot2)
+library(tidyr)
+
+
+```
+
+```{r load bike data}
+Bikes.2021 <- read.csv("./Data/Blue_Bike_Stations_2021.csv", stringsAsFactors = TRUE)
+
+Bikes.2021 <- Bikes.2021 %>%
+      filter(District=="Boston")
+```
+
+```{r convert bike data into shapefile}
+Bikes.2021.sf <- Bikes.2021 %>% 
+  st_as_sf(coords = c('Longitude', 'Latitude'), crs=4269)
+
+```
+
+
+```{r , census data load echo=FALSE}
+
+#Get key
+census_api_key('111339232f4137ed330544649d9c1c65d82c047c', `install=TRUE`)
+
+#census.data <-read.csv("boston_census.csv")
+
+#Get ACS variables 
+v20 <- load_variables(2020, "acs5", cache = TRUE)
+#View(v20)
+
+#census tract data for income
+ma_suffolk.income <- get_acs(
+  geography = "tract", 
+  variables = c(medIncome= "B19013_001" 
+                ),  
+  state = "MA", 
+  geometry = TRUE,
+  year = 2020,
+  county = "Suffolk"
+)
+
+#census tract data for race 
+ma_suffolk.race <- get_acs(
+  geography = "tract", 
+  variables = c(white= "B03002_003" , totpop = "B03002_001", black = "B03002_004"
+                ),  
+  state = "MA", 
+  geometry = TRUE,
+  year = 2020,
+  county = "Suffolk"
+)
+
+#census tract data for LABOR FORCE STATUS BY PRESENCE OF A COMPUTER AND TYPES OF INTERNET SUBSCRIPTION IN HOUSEHOLD 
+#ma_suffolk.labor.internet <- get_acs(
+#  geography = "tract", 
+#  variables = c(totlabor= "B28007_001" , laborforce = "B28007_002", employed = "B28007_003",
+#                compemployed = "B28007_004" , dialcompemployed = "B28007_005", broadcompemployed = #"B28007_006",
+#                nointernetemployed = "B28007_007" , nocompemployed = "B28007_008", unemployed = #"B28007_009",
+#               compunemployed = "B28007_010" , dialcompunemployed = "B28007_011", broadcompunemployed = #"B28007_012",
+#                nointernetunemployed = "B28007_013" , nocompunemployed = "B28007_014", nonlabor = #"B28007_015",
+#                compnonlabor = "B28007_016" , dialcompnonlabor = "B28007_017", broadcompnonlabor = #"B28007_018",
+#                notinernetnonlabor = "B28007_019" , nocompnonlabor = "B28007_020"
+#                ),  
+#  state = "MA", 
+#  geometry = TRUE,
+#  year = 2020,
+#  county = "Suffolk"
+#)
+
+
+ma_suffolk.wfh <- get_acs(
+  geography = "tract", 
+  variables = c(workfromhome="B08301_021"),  
+  state = "MA", 
+  geometry = TRUE,
+  year = 2020,
+  county = "Suffolk"
+)
+```
+
+```{r import shapefile and filter data from Suffolk County to Boston city level}
+census_tracts <- st_read(
+    "./JohnsonFromuthCohen_ENV872_EDA_FinalProject/Census2020_Tracts/Census2020_Tracts.shp")
+
+ma_suffolk.income <- ma_suffolk.income %>% 
+      filter(GEOID %in% census_tracts$GEOID20) %>%
+      filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
+         GEOID != "25025990101", GEOID != "25025080801", 
+         GEOID != "25025981100")
+
+ma_suffolk.race <- ma_suffolk.race %>% 
+      filter(GEOID %in% census_tracts$GEOID20) %>%
+      filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
+         GEOID != "25025990101", GEOID != "25025080801", 
+         GEOID != "25025981100")
+
+#ma_suffolk.labor.internet <- ma_suffolk.labor.internet %>% 
+#      filter(GEOID %in% census_tracts$GEOID20)
+
+ma_suffolk.wfh <- ma_suffolk.wfh %>% 
+      filter(GEOID %in% census_tracts$GEOID20) %>%
+      filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
+         GEOID != "25025990101", GEOID != "25025080801", 
+         GEOID != "25025981100")
+
+```
+
+```{r}
+
+#Organize data by removing moe and adjusting variables from long to wide 
+ma_suffolk.race <-select(ma_suffolk.race, -moe
+                      )
+
+ma_suffolk.race.1<-spread(ma_suffolk.race, key=variable, value=estimate)
+ma_suffolk.race.1
+
+
+#ma_suffolk.labor.internet.1 <-select(ma_suffolk.labor.internet, -moe
+#                      )
+
+#ma_suffolk.labor.internet.1<-spread(ma_suffolk.labor.internet, key=variable, value=estimate)
+#ma_suffolk.labor.internet
+
+
+ma_suffolk.wfh.1 <-select(ma_suffolk.wfh, -moe)
+
+ma_suffolk.wfh.1<-spread(ma_suffolk.wfh.1, key=variable, value=estimate)
+
+```
+
+```{r}
+
+#Calculate percentages 
+ma_suffolk.race.1 <- mutate(ma_suffolk.race.1, perwhite = white/totpop,
+                            perblack = black/totpop) 
+
+#ma_suffolk.labor.internet.1 <- mutate(ma_suffolk.labor.internet.1,
+#                                    perbroadcompemployed = broadcompemployed/totlabor,
+#                                    perbroadcompnonlabor = broadcompnonlabor/totlabor,
+#                                    perbroadcompunemployed = broadcompunemployed/totlabor,
+#                                    percompemployed = compemployed/totlabor,
+#                                    percompnonlabor = compnonlabor/totlabor,
+#                                    percompunemployed = compunemployed/totlabor,
+#                                    perdialcompemployed = dialcompemployed/totlabor,
+#                                    perdialcompnonlabor = dialcompnonlabor/totlabor,
+#                                    perdialcompunemployed = dialcompunemployed/totlabor,
+#                                    peremployed = employed/totlabor,
+#                                    perlaborforce = laborforce/totlabor,
+#                                    pernocompemployed = nocompemployed/totlabor,
+#                                    pernocompnonlabor = nocompnonlabor/totlabor,
+#                                    pernocompunemployed = nocompunemployed/totlabor,
+#                                    pernointernetemployed = nointernetemployed/totlabor,
+#                                    pernointernetunemployed = nointernetunemployed/totlabor,
+#                                    pernonlabor = nonlabor/totlabor,
+#                                    pernotinernetnonlabor = notinernetnonlabor/totlabor,
+#                                    perunemployed = unemployed/totlabor)
+```
+
+```{r}
+
+#Turn into shapefile 
+suffolk.race.sf <- ma_suffolk.race.1 %>% 
+  st_as_sf(coords = c('geometry'),
+           crs=4269)
+
+suffolk.income.sf <- ma_suffolk.income %>% 
+  st_as_sf(coords = c('geometry'),
+           crs=4269)
+
+#suffolk.labor.internet.sf <- ma_suffolk.labor.internet.1 %>% 
+#  st_as_sf(coords = c('geometry'),
+#           crs=4269)
+
+suffolk.wfh.sf <- ma_suffolk.wfh.1 %>% 
+  st_as_sf(coords = c('geometry'),
+           crs=4269)
+
+```
+
+```{r}
+
+#map percent white
+ggplot(suffolk.race.sf) + geom_sf(aes(fill=perwhite))
+
+#map percent black
+ggplot(suffolk.race.sf) + geom_sf(aes(fill=perblack))
+
+#map income
+ggplot(suffolk.income.sf) + geom_sf(aes(fill=estimate))
+
+#map labor force participation
+#ggplot(suffolk.labor.internet.sf) + geom_sf(aes(fill=perlaborforce))
+
+#map work from home
+ggplot(suffolk.wfh.sf) + geom_sf(aes(fill=workfromhome))
+
+
+#Income and bike stations
+ggplot() + geom_sf(data=suffolk.income.sf, aes(fill=estimate)) + geom_sf(data=Bikes.2021.sf, aes(color="white", alpha = 0.4))
+
+
+#Race and bike stations
+ggplot() + geom_sf(data=suffolk.race.sf, aes(fill=perwhite)) + geom_sf(data=Bikes.2021.sf, aes(color="white", alpha = 0.4))
+
+#labor force participation and bike stations
+#ggplot() + geom_sf(data=suffolk.labor.internet.sf, aes(fill=perlaborforce)) + geom_sf(data=Bikes.2021.sf, #aes(color="white", alpha = 0.4))
+
+#work from home and bike stations
+ggplot() + geom_sf(data=suffolk.wfh.sf, aes(fill=workfromhome)) + geom_sf(data=Bikes.2021.sf, alpha = 0.4, color= "white") + labs(fill="Number of Residents Working Remotely", title = "Bike Stations and Remote Work") + theme(axis.text.x = element_text(angle=45, vjust=0.5, hjust = 1))
+
+mapview(suffolk.income.sf, zcol = 'estimate') 
+
+```
+
+```{r race and bikes join and correlation}
+#joining race and bikes
+race.join <- st_join(x = suffolk.race.sf, y = Bikes.2021.sf, 
+                               join = st_intersects)
+
+Bikes.race.join <- race.join %>%
+  group_by(NAME, perwhite, perblack, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+race.bikes.correlation <- lm(data=Bikes.race.join, NumStations ~ perblack )
+summary(race.bikes.correlation)
+#R-squared 0.02771, p-value 0.08221. Not statistically significant  
+
+
+
+```
+
+```{r wfh joining and correlation}
+#joining home ownership and bikes
+WFH.join <- st_join(x = suffolk.wfh.sf, y = Bikes.2021.sf, 
+                               join = st_intersects)
+
+Bikes.WFH.processed <- WFH.join %>%
+  group_by(NAME, workfromhome, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+WFH.bikes.correlation <- lm(data=Bikes.WFH.processed , NumStations ~ workfromhome )
+summary(WFH.bikes.correlation)
+#R-squared 0.001843, p-value 0.5441. Not statistically significant -VERY large p value!  
+
+cor.test(Bikes.WFH.processed$NumStations, Bikes.WFH.processed$workfromhome)
+#Correlation coefficient is 0.0429. Correlation is very weak (practically none)
+
+```
+
+
+
+##homeownership (absolute) 
+```{r Homeownership absolute}
+
+boston_HMO <- get_acs(
+  geography = "tract", 
+  variables = "B25118_002E",
+  state = "25025", 
+  county = "025",
+  geometry = TRUE
+)
+
+plot(boston_HMO["estimate"]) 
+
+```
+
+##total homes (absolute) 
+```{r Total homes absolute}
+
+boston_Htot <- get_acs(
+  geography = "tract", 
+  variables = "B25118_001E",
+  state = "25025", 
+  county = "025",
+  geometry = TRUE
+  
+)
+```
+
+#Mutate data and create percentages 
+```{r mutate home data and plot}
+
+bostonmerge <- cbind(boston_HMO,boston_Htot)
+
+boston_HMOpr <- 
+  bostonmerge %>% 
+  filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
+         GEOID != "25025990101", GEOID != "25025080801", 
+         GEOID != "25025981100")%>%
+  select(GEOID, NAME, variable, estimate, estimate.1, geometry) %>%
+  mutate(percentHMO = (estimate/estimate.1))
+  
+plot(boston_HMOpr["percentHMO"])
+```
+
+```{r ggplot home data}
+
+ggplot() + 
+  geom_sf(data=boston_HMOpr_sf, aes(fill=percentHMO)) + geom_sf(data=Bikes.2021.sf, alpha = 0.4, color= "white") + labs(fill="Percent of Homeowners", title = "Bike Stations and Homeownership") + theme(axis.text.x = element_text(angle=45, vjust=0.5, hjust = 1))
+
+boston_HMOpr_sf <- boston_HMOpr %>% 
+  st_as_sf(coords = c('SITE_LONGITUDE','SITE_LATITUDE'), crs=4269)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r Home ownership and bikes joining and regression}
+
+#joining home ownership and bikes
+HMO.join <- st_join(x = boston_HMOpr_sf, y = Bikes.2021.sf, 
+                               join = st_intersects)
+
+Bikes.HMO <- HMO.join %>%
+  group_by(NAME, percentHMO, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+HMO.bikes.correlation <- lm(data=Bikes.HMO, NumStations ~ percentHMO )
+summary(HMO.bikes.correlation)
+#R-squared 0.028391, p-value 0.02046 (<0.05) statistically significant? 
+
+cor.test(Bikes.HMO$NumStations, Bikes.HMO$percentHMO)
+#Correlation coefficient is -0.1685048. Correlation is weak but negative 
+
+
+```
+
+
+
