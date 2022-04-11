@@ -59,6 +59,8 @@ filtered_allegheny_income <- transform(allegheny_income, CensusTract = substr(GE
 pittsburgh_income <- filtered_allegheny_income %>% 
       filter(CensusTract %in% tracts$X0103)
 
+plot(pittsburgh_income)
+
 ```
 
 ## Bike Lane Data
@@ -76,6 +78,56 @@ ggplot() +
   geom_sf(data=pittsburgh_income, aes(fill=estimate)) + 
   geom_sf(data=bike_map_2019, aes(color=BikeInfDis)) +
   scale_color_distiller(palette = "YlOrRd")
+
+```
+
+##Get homeownership in absolute numbers 
+```{r Homeownership}
+
+boston_HMO <- get_acs(
+  geography = "tract", 
+  variables = "B25118_002E",
+  state = "25025", 
+  county = "025",
+  geometry = TRUE
+)
+
+plot(boston_HMO["estimate"]) 
+
+filtered_allegheny_income <- transform(allegheny_income, CensusTract = substr(GEOID, 6, 9))
+
+pittsburgh_income <- filtered_allegheny_income %>% 
+      filter(CensusTract %in% tracts$X0103)
+
+
+dc_income
+plot(dc_income["estimate"])
+
+```
+
+##Get homes in absolute numbers 
+```{r Total homes}
+
+boston_Htot <- get_acs(
+  geography = "tract", 
+  variables = "B25118_001E",
+  state = "25025", 
+  county = "025",
+  geometry = TRUE
+  
+)
+
+```
+
+#Mutate data and create percentages 
+```{r mutate home data}
+
+NTL.phys.data.processed <- 
+  NTL.phys.data %>%
+  filter(lakename == "Paul Lake" | lakename == "Peter Lake") %>%
+  select(lakename, sampledate:temperature_C) %>%
+  mutate(temperature_F = (temperature_C*9/5) + 32)
+
 
 ```
 
