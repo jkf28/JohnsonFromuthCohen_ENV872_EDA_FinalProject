@@ -213,6 +213,28 @@ suffolk.wfh.sf <- ma_suffolk.wfh.1 %>%
 ```
 
 ```{r}
+#Joining bike data and census tract data
+
+suffolk.join <- st_join(x = suffolk.income.sf, y = bikes.suffolk.sf, 
+                               join = st_intersects)
+
+suffolk.join.sf <- suffolk.join %>% 
+  st_as_sf(coords = c('geometry'),
+           crs=4269)
+
+mapview(suffolk.join.sf)
+```
+
+```{r}
+#Number of docks and stations per census tract. Can run regression see correlations. NA is zero 
+Bikes.Census <- suffolk.join %>%
+  group_by(NAME, estimate, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+```
+
+```{r}
 
 #map percent white
 ggplot(suffolk.race.sf) + geom_sf(aes(fill=perwhite))
