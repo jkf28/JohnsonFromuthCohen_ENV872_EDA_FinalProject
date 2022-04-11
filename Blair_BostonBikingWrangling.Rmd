@@ -38,7 +38,7 @@ library(tidyr)
 
 ```
 
-```{r load bike data}
+```{r load bike data and filter for Boston}
 Bikes.2021 <- read.csv("./Data/Blue_Bike_Stations_2021.csv", stringsAsFactors = TRUE)
 
 Bikes.2021 <- Bikes.2021 %>%
@@ -50,7 +50,6 @@ Bikes.2021.sf <- Bikes.2021 %>%
   st_as_sf(coords = c('Longitude', 'Latitude'), crs=4269)
 
 ```
-
 
 ```{r , census data load echo=FALSE}
 
@@ -119,7 +118,7 @@ ma_suffolk.wfh <- ma_suffolk.wfh %>%
 
 ```
 
-```{r}
+```{r data wrangling}
 
 #Organize data by removing moe and adjusting variables from long to wide 
 ma_suffolk.race <-select(ma_suffolk.race, -moe
@@ -135,7 +134,7 @@ ma_suffolk.wfh.1<-spread(ma_suffolk.wfh.1, key=variable, value=estimate)
 
 ```
 
-```{r}
+```{r calculate race percentages}
 
 #Calculate percentages 
 ma_suffolk.race.1 <- mutate(ma_suffolk.race.1, perwhite = white/totpop,
@@ -143,7 +142,7 @@ ma_suffolk.race.1 <- mutate(ma_suffolk.race.1, perwhite = white/totpop,
 
 ```
 
-```{r}
+```{r turn census aata into shapefiles}
 
 #Turn into shapefile 
 suffolk.race.sf <- ma_suffolk.race.1 %>% 
@@ -160,7 +159,7 @@ suffolk.wfh.sf <- ma_suffolk.wfh.1 %>%
 
 ```
 
-```{r}
+```{r map variables}
 
 #map percent white
 ggplot(suffolk.race.sf) + geom_sf(aes(fill=perwhite))
@@ -242,7 +241,7 @@ boston_HMOpr_sf <- boston_HMOpr %>%
   st_as_sf(coords = c('SITE_LONGITUDE','SITE_LATITUDE'), crs=4269)
 ```
 
-```{r}
+```{r join bike data and census tract data}
 #Joining bike data and census tract data
 
 suffolk.join <- st_join(x = suffolk.income.sf, y = bikes.suffolk.sf, 
@@ -255,7 +254,7 @@ suffolk.join.sf <- suffolk.join %>%
 mapview(suffolk.join.sf)
 ```
 
-```{r}
+```{r calculate number of docks and stations per census tracks}
 #Number of docks and stations per census tract. Can run regression see correlations. NA is zero 
 Bikes.Census <- suffolk.join %>%
   group_by(NAME, estimate, GEOID) %>%
