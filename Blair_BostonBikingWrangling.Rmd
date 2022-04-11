@@ -39,7 +39,7 @@ library(tidyr)
 ```
 
 ```{r load bike data}
-Bikes.2021 <- read.csv("Blue_Bike_Stations_2021.csv", stringsAsFactors = TRUE)
+Bikes.2021 <- read.csv("./Data/Blue_Bike_Stations_2021.csv", stringsAsFactors = TRUE)
 
 Bikes.2021 <- Bikes.2021 %>%
       filter(District=="Boston")
@@ -115,7 +115,7 @@ ma_suffolk.wfh <- get_acs(
 
 ```{r import shapefile and filter data from Suffolk County to Boston city level}
 census_tracts <- st_read(
-  "./Census2020_Tracts/Census2020_Tracts.shp")
+    "./JohnsonFromuthCohen_ENV872_EDA_FinalProject/Census2020_Tracts/Census2020_Tracts.shp")
 
 ma_suffolk.income <- ma_suffolk.income %>% 
       filter(GEOID %in% census_tracts$GEOID20) %>%
@@ -124,7 +124,7 @@ ma_suffolk.income <- ma_suffolk.income %>%
          GEOID != "25025981100")
 
 ma_suffolk.race <- ma_suffolk.race %>% 
-      filter(GEOID %in% census_tracts$GEOID20)
+      filter(GEOID %in% census_tracts$GEOID20) %>%
       filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
          GEOID != "25025990101", GEOID != "25025080801", 
          GEOID != "25025981100")
@@ -133,7 +133,7 @@ ma_suffolk.race <- ma_suffolk.race %>%
 #      filter(GEOID %in% census_tracts$GEOID20)
 
 ma_suffolk.wfh <- ma_suffolk.wfh %>% 
-      filter(GEOID %in% census_tracts$GEOID20)
+      filter(GEOID %in% census_tracts$GEOID20) %>%
       filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
          GEOID != "25025990101", GEOID != "25025080801", 
          GEOID != "25025981100")
@@ -241,11 +241,50 @@ ggplot() + geom_sf(data=suffolk.race.sf, aes(fill=perwhite)) + geom_sf(data=Bike
 #ggplot() + geom_sf(data=suffolk.labor.internet.sf, aes(fill=perlaborforce)) + geom_sf(data=Bikes.2021.sf, #aes(color="white", alpha = 0.4))
 
 #work from home and bike stations
-ggplot() + geom_sf(data=suffolk.wfh.sf, aes(fill=workfromhome)) + geom_sf(data=Bikes.2021.sf, aes(color="white", alpha = 0.4))
+ggplot() + geom_sf(data=suffolk.wfh.sf, aes(fill=workfromhome)) + geom_sf(data=Bikes.2021.sf, alpha = 0.4, color= "white") + labs(fill="Number of Residents Working Remotely", title = "Bike Stations and Remote Work") + theme(axis.text.x = element_text(angle=45, vjust=0.5, hjust = 1))
 
 mapview(suffolk.income.sf, zcol = 'estimate') 
 
 ```
+
+```{r race and bikes join and correlation}
+#joining race and bikes
+race.join <- st_join(x = suffolk.race.sf, y = Bikes.2021.sf, 
+                               join = st_intersects)
+
+Bikes.race.join <- race.join %>%
+  group_by(NAME, perwhite, perblack, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+race.bikes.correlation <- lm(data=Bikes.race.join, NumStations ~ perblack )
+summary(race.bikes.correlation)
+#R-squared 0.02771, p-value 0.08221. Not statistically significant  
+
+
+
+```
+
+```{r wfh joining and correlation}
+#joining home ownership and bikes
+WFH.join <- st_join(x = suffolk.wfh.sf, y = Bikes.2021.sf, 
+                               join = st_intersects)
+
+Bikes.WFH.processed <- WFH.join %>%
+  group_by(NAME, workfromhome, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+WFH.bikes.correlation <- lm(data=Bikes.WFH.processed , NumStations ~ workfromhome )
+summary(WFH.bikes.correlation)
+#R-squared 0.001843, p-value 0.5441. Not statistically significant -VERY large p value!  
+
+cor.test(Bikes.WFH.processed$NumStations, Bikes.WFH.processed$workfromhome)
+#Correlation coefficient is 0.0429. Correlation is very weak (practically none)
+
+```
+
+
 
 ##homeownership (absolute) 
 ```{r Homeownership absolute}
@@ -286,19 +325,41 @@ boston_HMOpr <-
          GEOID != "25025990101", GEOID != "25025080801", 
          GEOID != "25025981100")%>%
   select(GEOID, NAME, variable, estimate, estimate.1, geometry) %>%
-  mutate(percent = (estimate/estimate.1))
+  mutate(percentHMO = (estimate/estimate.1))
   
-plot(boston_HMOpr["percent"])
+plot(boston_HMOpr["percentHMO"])
 ```
 
 ```{r ggplot home data}
 
 ggplot() + 
-  geom_sf(data=boston_HMOpr, aes(fill=percent, geometry = geometry)) +
-  scale_color_distiller(palette = "YlOrRd")
+  geom_sf(data=boston_HMOpr_sf, aes(fill=percentHMO)) + geom_sf(data=Bikes.2021.sf, alpha = 0.4, color= "white") + labs(fill="Percent of Homeowners", title = "Bike Stations and Homeownership") + theme(axis.text.x = element_text(angle=45, vjust=0.5, hjust = 1))
 
 boston_HMOpr_sf <- boston_HMOpr %>% 
   st_as_sf(coords = c('SITE_LONGITUDE','SITE_LATITUDE'), crs=4269)
 ```
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r Home ownership and bikes joining and regression}
+
+#joining home ownership and bikes
+HMO.join <- st_join(x = boston_HMOpr_sf, y = Bikes.2021.sf, 
+                               join = st_intersects)
+
+Bikes.HMO <- HMO.join %>%
+  group_by(NAME, percentHMO, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+HMO.bikes.correlation <- lm(data=Bikes.HMO, NumStations ~ percentHMO )
+summary(HMO.bikes.correlation)
+#R-squared 0.028391, p-value 0.02046 (<0.05) statistically significant? 
+
+cor.test(Bikes.HMO$NumStations, Bikes.HMO$percentHMO)
+#Correlation coefficient is -0.1685048. Correlation is weak but negative 
+
+
+```
+
+
+
