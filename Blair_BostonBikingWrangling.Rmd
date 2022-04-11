@@ -85,24 +85,6 @@ ma_suffolk.race <- get_acs(
   county = "Suffolk"
 )
 
-#census tract data for LABOR FORCE STATUS BY PRESENCE OF A COMPUTER AND TYPES OF INTERNET SUBSCRIPTION IN HOUSEHOLD 
-#ma_suffolk.labor.internet <- get_acs(
-#  geography = "tract", 
-#  variables = c(totlabor= "B28007_001" , laborforce = "B28007_002", employed = "B28007_003",
-#                compemployed = "B28007_004" , dialcompemployed = "B28007_005", broadcompemployed = #"B28007_006",
-#                nointernetemployed = "B28007_007" , nocompemployed = "B28007_008", unemployed = #"B28007_009",
-#               compunemployed = "B28007_010" , dialcompunemployed = "B28007_011", broadcompunemployed = #"B28007_012",
-#                nointernetunemployed = "B28007_013" , nocompunemployed = "B28007_014", nonlabor = #"B28007_015",
-#                compnonlabor = "B28007_016" , dialcompnonlabor = "B28007_017", broadcompnonlabor = #"B28007_018",
-#                notinernetnonlabor = "B28007_019" , nocompnonlabor = "B28007_020"
-#                ),  
-#  state = "MA", 
-#  geometry = TRUE,
-#  year = 2020,
-#  county = "Suffolk"
-#)
-
-
 ma_suffolk.wfh <- get_acs(
   geography = "tract", 
   variables = c(workfromhome="B08301_021"),  
@@ -129,9 +111,6 @@ ma_suffolk.race <- ma_suffolk.race %>%
          GEOID != "25025990101", GEOID != "25025080801", 
          GEOID != "25025981100")
 
-#ma_suffolk.labor.internet <- ma_suffolk.labor.internet %>% 
-#      filter(GEOID %in% census_tracts$GEOID20)
-
 ma_suffolk.wfh <- ma_suffolk.wfh %>% 
       filter(GEOID %in% census_tracts$GEOID20) %>%
       filter(GEOID != "25025981202", GEOID != "25025981800", GEOID != "25025981300",
@@ -150,13 +129,6 @@ ma_suffolk.race.1<-spread(ma_suffolk.race, key=variable, value=estimate)
 ma_suffolk.race.1
 
 
-#ma_suffolk.labor.internet.1 <-select(ma_suffolk.labor.internet, -moe
-#                      )
-
-#ma_suffolk.labor.internet.1<-spread(ma_suffolk.labor.internet, key=variable, value=estimate)
-#ma_suffolk.labor.internet
-
-
 ma_suffolk.wfh.1 <-select(ma_suffolk.wfh, -moe)
 
 ma_suffolk.wfh.1<-spread(ma_suffolk.wfh.1, key=variable, value=estimate)
@@ -169,26 +141,6 @@ ma_suffolk.wfh.1<-spread(ma_suffolk.wfh.1, key=variable, value=estimate)
 ma_suffolk.race.1 <- mutate(ma_suffolk.race.1, perwhite = white/totpop,
                             perblack = black/totpop) 
 
-#ma_suffolk.labor.internet.1 <- mutate(ma_suffolk.labor.internet.1,
-#                                    perbroadcompemployed = broadcompemployed/totlabor,
-#                                    perbroadcompnonlabor = broadcompnonlabor/totlabor,
-#                                    perbroadcompunemployed = broadcompunemployed/totlabor,
-#                                    percompemployed = compemployed/totlabor,
-#                                    percompnonlabor = compnonlabor/totlabor,
-#                                    percompunemployed = compunemployed/totlabor,
-#                                    perdialcompemployed = dialcompemployed/totlabor,
-#                                    perdialcompnonlabor = dialcompnonlabor/totlabor,
-#                                    perdialcompunemployed = dialcompunemployed/totlabor,
-#                                    peremployed = employed/totlabor,
-#                                    perlaborforce = laborforce/totlabor,
-#                                    pernocompemployed = nocompemployed/totlabor,
-#                                    pernocompnonlabor = nocompnonlabor/totlabor,
-#                                    pernocompunemployed = nocompunemployed/totlabor,
-#                                    pernointernetemployed = nointernetemployed/totlabor,
-#                                    pernointernetunemployed = nointernetunemployed/totlabor,
-#                                    pernonlabor = nonlabor/totlabor,
-#                                    pernotinernetnonlabor = notinernetnonlabor/totlabor,
-#                                    perunemployed = unemployed/totlabor)
 ```
 
 ```{r}
@@ -202,35 +154,9 @@ suffolk.income.sf <- ma_suffolk.income %>%
   st_as_sf(coords = c('geometry'),
            crs=4269)
 
-#suffolk.labor.internet.sf <- ma_suffolk.labor.internet.1 %>% 
-#  st_as_sf(coords = c('geometry'),
-#           crs=4269)
-
 suffolk.wfh.sf <- ma_suffolk.wfh.1 %>% 
   st_as_sf(coords = c('geometry'),
            crs=4269)
-
-```
-
-```{r}
-#Joining bike data and census tract data
-
-suffolk.join <- st_join(x = suffolk.income.sf, y = bikes.suffolk.sf, 
-                               join = st_intersects)
-
-suffolk.join.sf <- suffolk.join %>% 
-  st_as_sf(coords = c('geometry'),
-           crs=4269)
-
-mapview(suffolk.join.sf)
-```
-
-```{r}
-#Number of docks and stations per census tract. Can run regression see correlations. NA is zero 
-Bikes.Census <- suffolk.join %>%
-  group_by(NAME, estimate, GEOID) %>%
-  summarise(BikeDocks = sum(Total_docks),
-            NumStations = length(unique(Number)))
 
 ```
 
@@ -245,9 +171,6 @@ ggplot(suffolk.race.sf) + geom_sf(aes(fill=perblack))
 #map income
 ggplot(suffolk.income.sf) + geom_sf(aes(fill=estimate))
 
-#map labor force participation
-#ggplot(suffolk.labor.internet.sf) + geom_sf(aes(fill=perlaborforce))
-
 #map work from home
 ggplot(suffolk.wfh.sf) + geom_sf(aes(fill=workfromhome))
 
@@ -259,54 +182,12 @@ ggplot() + geom_sf(data=suffolk.income.sf, aes(fill=estimate)) + geom_sf(data=Bi
 #Race and bike stations
 ggplot() + geom_sf(data=suffolk.race.sf, aes(fill=perwhite)) + geom_sf(data=Bikes.2021.sf, aes(color="white", alpha = 0.4))
 
-#labor force participation and bike stations
-#ggplot() + geom_sf(data=suffolk.labor.internet.sf, aes(fill=perlaborforce)) + geom_sf(data=Bikes.2021.sf, #aes(color="white", alpha = 0.4))
-
 #work from home and bike stations
 ggplot() + geom_sf(data=suffolk.wfh.sf, aes(fill=workfromhome)) + geom_sf(data=Bikes.2021.sf, alpha = 0.4, color= "white") + labs(fill="Number of Residents Working Remotely", title = "Bike Stations and Remote Work") + theme(axis.text.x = element_text(angle=45, vjust=0.5, hjust = 1))
 
 mapview(suffolk.income.sf, zcol = 'estimate') 
 
 ```
-
-```{r race and bikes join and correlation}
-#joining race and bikes
-race.join <- st_join(x = suffolk.race.sf, y = Bikes.2021.sf, 
-                               join = st_intersects)
-
-Bikes.race.join <- race.join %>%
-  group_by(NAME, perwhite, perblack, GEOID) %>%
-  summarise(BikeDocks = sum(Total_docks),
-            NumStations = length(unique(Number)))
-
-race.bikes.correlation <- lm(data=Bikes.race.join, NumStations ~ perblack )
-summary(race.bikes.correlation)
-#R-squared 0.02771, p-value 0.08221. Not statistically significant  
-
-
-
-```
-
-```{r wfh joining and correlation}
-#joining home ownership and bikes
-WFH.join <- st_join(x = suffolk.wfh.sf, y = Bikes.2021.sf, 
-                               join = st_intersects)
-
-Bikes.WFH.processed <- WFH.join %>%
-  group_by(NAME, workfromhome, GEOID) %>%
-  summarise(BikeDocks = sum(Total_docks),
-            NumStations = length(unique(Number)))
-
-WFH.bikes.correlation <- lm(data=Bikes.WFH.processed , NumStations ~ workfromhome )
-summary(WFH.bikes.correlation)
-#R-squared 0.001843, p-value 0.5441. Not statistically significant -VERY large p value!  
-
-cor.test(Bikes.WFH.processed$NumStations, Bikes.WFH.processed$workfromhome)
-#Correlation coefficient is 0.0429. Correlation is very weak (practically none)
-
-```
-
-
 
 ##homeownership (absolute) 
 ```{r Homeownership absolute}
@@ -361,7 +242,65 @@ boston_HMOpr_sf <- boston_HMOpr %>%
   st_as_sf(coords = c('SITE_LONGITUDE','SITE_LATITUDE'), crs=4269)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+#Joining bike data and census tract data
+
+suffolk.join <- st_join(x = suffolk.income.sf, y = bikes.suffolk.sf, 
+                               join = st_intersects)
+
+suffolk.join.sf <- suffolk.join %>% 
+  st_as_sf(coords = c('geometry'),
+           crs=4269)
+
+mapview(suffolk.join.sf)
+```
+
+```{r}
+#Number of docks and stations per census tract. Can run regression see correlations. NA is zero 
+Bikes.Census <- suffolk.join %>%
+  group_by(NAME, estimate, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+```
+
+```{r race and bikes join and correlation}
+#joining race and bikes
+race.join <- st_join(x = suffolk.race.sf, y = Bikes.2021.sf, 
+                               join = st_intersects)
+
+Bikes.race.join <- race.join %>%
+  group_by(NAME, perwhite, perblack, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+race.bikes.correlation <- lm(data=Bikes.race.join, NumStations ~ perblack )
+summary(race.bikes.correlation)
+#R-squared 0.02771, p-value 0.08221. Not statistically significant  
+
+
+
+```
+
+```{r wfh joining and correlation}
+#joining working from home and bikes
+WFH.join <- st_join(x = suffolk.wfh.sf, y = Bikes.2021.sf, 
+                               join = st_intersects)
+
+Bikes.WFH.processed <- WFH.join %>%
+  group_by(NAME, workfromhome, GEOID) %>%
+  summarise(BikeDocks = sum(Total_docks),
+            NumStations = length(unique(Number)))
+
+WFH.bikes.correlation <- lm(data=Bikes.WFH.processed , NumStations ~ workfromhome )
+summary(WFH.bikes.correlation)
+#R-squared 0.001843, p-value 0.5441. Not statistically significant -VERY large p value!  
+
+cor.test(Bikes.WFH.processed$NumStations, Bikes.WFH.processed$workfromhome)
+#Correlation coefficient is 0.0429. Correlation is very weak (practically none)
+
+```
+
 ```{r Home ownership and bikes joining and regression}
 
 #joining home ownership and bikes
